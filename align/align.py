@@ -61,10 +61,11 @@ def read_script(script_path):
 
 model = None
 
-def init_stt(output_graph_path, lm_path, trie_path):
+def init_stt(output_graph_path, lm_path):
     global model
-    model = deepspeech.Model(output_graph_path, BEAM_WIDTH)
-    model.enableDecoderWithLM(lm_path, trie_path, LM_ALPHA, LM_BETA)
+    model = deepspeech.Model(output_graph_path)
+    model.setBeamWidth(BEAM_WIDTH)
+    model.enableExternalScorer(lm_path)
     logging.debug('Process {}: Loaded models'.format(os.getpid()))
 
 
@@ -421,8 +422,8 @@ def main():
             if output_graph_path is None:
                 logging.debug('Looking for model files in "{}"...'.format(model_dir))
                 output_graph_path = glob(model_dir + "/output_graph.pb")[0]
-                lang_lm_path = glob(model_dir + "/lm.binary")[0]
-                lang_trie_path = glob(model_dir + "/trie")[0]
+                lang_lm_path = glob(model_dir + "/*.scorer")[0]
+                # lang_trie_path = glob(model_dir + "/trie")[0]
             kenlm_path = 'dependencies/kenlm/build/bin'
             if not path.exists(kenlm_path):
                 kenlm_path = None
@@ -470,7 +471,7 @@ def main():
                     ])
             else:
                 lm_path = lang_lm_path
-                trie_path = lang_trie_path
+                trie_path = None#lang_trie_path
 
             logging.debug('Loading acoustic model from "{}", alphabet from "{}", trie from "{}" and language model from "{}"...'
                           .format(output_graph_path, alphabet_path, trie_path, lm_path))
@@ -499,7 +500,7 @@ def main():
             samples = list(progress(pre_filter(), desc='VAD splitting'))
 
             pool = multiprocessing.Pool(initializer=init_stt,
-                                        initargs=(output_graph_path, lm_path, trie_path),
+                                        initargs=(output_graph_path, lm_path),
                                         processes=args.stt_workers)
             transcripts = list(progress(pool.imap(stt, samples), desc='Transcribing', total=len(samples)))
 
